@@ -87,7 +87,7 @@ def bridge(recver, sender):
 def append_log(msg):
     dt = str(datetime.now())
     print(dt + '|' + msg)
-    with open('proxy_log.txt', 'a') as f:
+    with open('log.txt', 'a') as f:
         f.write(dt + '|' + msg + '\n')
 
 
