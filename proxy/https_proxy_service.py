@@ -1,27 +1,50 @@
 import socket
+import json
 from datetime import datetime
 from threading import Thread
 
-listen_addr = ('localhost', 7777)
-
-listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-listener.bind(listen_addr)
+listen_addr = ('localhost', 8888)
 
 
 def listen_start():
-    append_log('Start listen')
-    listener.listen(20)
+    append_log('proxy start')
+    proxy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    proxy.bind(listen_addr)
+    proxy.listen(20)
 
     while True:
-        client, addr = listener.accept()
-        header_recver = Thread(target=recv_header, args=[client])
-        header_recver.setDaemon(True)
-        header_recver.start()
+        client, addr = proxy.accept()
+        append_log('connect to {0}:{1}'.format(addr[0], addr[1]))
+
+        checker = Thread(target=recv_header, args=[client, addr])
+        checker.setDaemon(True)
+        checker.start()
 
 
-def recv_header(client):
-    service = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+def check_auth(client, addr):
     try:
+        token = client.recv(50).decode().split(';_;_;')
+        with open('auth.json', 'r') as f:
+            auth = json.load(f)
+        for u in auth:
+            if u['name'] == token[0] and u['pwd'] == token[1]:
+                client.sendall(b'1')
+                return client
+        client.sendall(b'0')
+        client.close()
+        append_log('{0}:{1} auth failed'.format(addr[0], addr[1]))
+        return None
+    except Exception as ex:
+        append_log(str(ex))
+        client.close()
+
+
+def recv_header(auth_checker, addr):
+    try:
+        client = check_auth(auth_checker, addr)
+        if not client:
+            return
+
         header = client.recv(1024).decode()
         headerItems = header.split('\r\n')
         typeIndex = headerItems[0].find('CONNECT')
@@ -29,6 +52,7 @@ def recv_header(client):
             return
 
         host = headerItems[0][typeIndex+8:].split(':')[0]
+        service = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         service.connect((host, 443))
         client.sendall(b'HTTP/1.0 200 Connection Established\r\n\r\n')
         append_log('connect to [{0}]'.format(host))
@@ -63,7 +87,7 @@ def bridge(recver, sender):
 def append_log(msg):
     dt = str(datetime.now())
     print(dt + '|' + msg)
-    with open('log.txt', 'a') as f:
+    with open('proxy_log.txt', 'a') as f:
         f.write(dt + '|' + msg + '\n')
 
 
