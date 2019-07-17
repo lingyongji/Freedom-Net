@@ -2,7 +2,7 @@
     {
         "name":"admin",
         "pwd":"admin",
-        "ip": "149.28.44.90",
+        "ip": "127.0.0.1",
         "port": 8888,
         "used": true
     }
