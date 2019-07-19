@@ -1,9 +1,10 @@
 import socket
 import json
+import time
 from datetime import datetime
 from threading import Thread
 
-listen_addr = ('localhost', 8888)
+listen_addr = ('0.0.0.0', 8888) #linux
 
 
 def listen_start():
@@ -19,6 +20,7 @@ def listen_start():
         checker = Thread(target=recv_header, args=[client, addr])
         checker.setDaemon(True)
         checker.start()
+        time.sleep(1)
 
 
 def check_auth(client, addr):
@@ -81,7 +83,6 @@ def bridge(recver, sender):
     finally:
         recver.close()
         sender.close()
-        append_log('bridge close')
 
 
 def append_log(msg):

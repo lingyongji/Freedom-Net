@@ -1,9 +1,9 @@
 [
-    {
-        "name":"admin",
-        "pwd":"admin",
-        "ip": "127.0.0.1",
-        "port": 8888,
-        "used": true
-    }
+	{
+		"name": "admin",
+		"pwd": "admin",
+		"ip": "127.0.0.1",
+		"port": 8888,
+		"used": true
+	}
 ]

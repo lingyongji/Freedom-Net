@@ -7,7 +7,7 @@ from threading import Thread
 def listen_start():
     append_log('start listen local')
     local = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    local.bind(('localhost', 7777))
+    local.bind(('127.0.0.1', 7777))
     local.listen(20)
 
     while True:
@@ -26,7 +26,7 @@ def check_auth():
         with open('config.json', 'r') as f:
             auth = json.load(f)
             for u in auth:
-                if u['used']:
+                if bool(u['used']):
                     lg = '{0};_;_;{1}'.format(u['name'], u['pwd'])
                     proxy.connect((u['ip'], u['port']))
                     proxy.sendall(lg.encode())
