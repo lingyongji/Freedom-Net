@@ -1,0 +1,2 @@
+#!/bin/bash
+eval $(ps -ef|grep "[0-9] python3 https_proxy_service.py"|awk '{print "kill "$2}')

@@ -14,7 +14,7 @@ def listen_start():
 
     while True:
         client, addr = local.accept()
-        append_log('connect to {0}:{1}'.format(addr[0], addr[1]))
+        # append_log('connect to {0}:{1}'.format(addr[0], addr[1]))
 
         header_recver = Thread(target=send_header, args=[client])
         header_recver.setDaemon(True)
@@ -86,9 +86,9 @@ def bridge(recver, sender):
 
 def append_log(msg):
     dt = str(datetime.now())
-    print(dt + '|' + msg)
+    print(dt + ' | ' + msg)
     with open('log.txt', 'a') as f:
-        f.write(dt + '|' + msg + '\n')
+        f.write(dt + ' | ' + msg + '\n')
 
 
 if __name__ == '__main__':
