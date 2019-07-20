@@ -4,15 +4,40 @@ import time
 from datetime import datetime
 from threading import Thread
 
-listen_addr = ('0.0.0.0', 8888) #linux
+listen_addr_ipv4 = ('0.0.0.0', 8888)
+listen_addr_ipv6 = ('::', 8889)
+BUFFER_SIZE = 4096
 
 
 def listen_start():
     append_log('proxy start')
-    proxy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    proxy.bind(listen_addr)
-    proxy.listen(20)
+    try:
+        proxy_v4 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        proxy_v4.bind(listen_addr_ipv4)
+        listener_v4 = Thread(target=proxy_listen, args=[proxy_v4])
+        listener_v4.setDaemon(True)
+        listener_v4.start()
+    except Exception as ex:
+        append_log(str(ex))
 
+    try:
+        proxy_v6 = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        proxy_v6.bind(listen_addr_ipv6)
+        listener_v6 = Thread(target=proxy_listen, args=[proxy_v6])
+        listener_v6.setDaemon(True)
+        listener_v6.start()
+    except Exception as ex:
+        append_log(str(ex))
+
+    hours = 0
+    while True:
+        time.sleep(3600)
+        append_log('proxy run {0} hour(s)'.format(hours))
+        hours += 1
+
+
+def proxy_listen(proxy):
+    proxy.listen(10)
     while True:
         client, addr = proxy.accept()
         append_log('connect to {0}:{1}'.format(addr[0], addr[1]))
@@ -20,7 +45,6 @@ def listen_start():
         checker = Thread(target=recv_header, args=[client, addr])
         checker.setDaemon(True)
         checker.start()
-        time.sleep(1)
 
 
 def check_auth(client, addr):
@@ -47,14 +71,16 @@ def recv_header(auth_checker, addr):
         if not client:
             return
 
-        header = client.recv(1024).decode()
+        header = client.recv(BUFFER_SIZE).decode()
         headerItems = header.split('\r\n')
-        typeIndex = headerItems[0].find('CONNECT')
-        if typeIndex < 0:
+
+        connect_index = headerItems[0].find('CONNECT')
+        if connect_index < 0:
+            client.close()
             return
 
-        host = headerItems[0][typeIndex+8:].split(':')[0]
-        service = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        host = headerItems[0][connect_index+8:].split(':')[0]
+        service = socket.socket(client.family, socket.SOCK_STREAM)
         service.connect((host, 443))
         client.sendall(b'HTTP/1.0 200 Connection Established\r\n\r\n')
         append_log('connect to [{0}]'.format(host))
@@ -74,10 +100,10 @@ def recv_header(auth_checker, addr):
 
 def bridge(recver, sender):
     try:
-        data = recver.recv(1024)
+        data = recver.recv(BUFFER_SIZE)
         while data:
             sender.sendall(data)
-            data = recver.recv(1024)
+            data = recver.recv(BUFFER_SIZE)
     except Exception as ex:
         append_log(str(ex))
     finally:

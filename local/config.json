@@ -1,9 +1,18 @@
 [
 	{
+		"ipv?": 4,
+		"ip": "localhost",
+		"port": 8888,
 		"name": "admin",
 		"pwd": "admin",
-		"ip": "127.0.0.1",
-		"port": 8888,
+		"used": true
+	},
+	{
+		"ipv?": 6,
+		"ip": "::",
+		"port": 8889,
+		"name": "admin",
+		"pwd": "admin",
 		"used": true
 	}
 ]

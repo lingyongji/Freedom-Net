@@ -3,11 +3,13 @@ import json
 from datetime import datetime
 from threading import Thread
 
+BUFFER_SIZE = 4096
+
 
 def listen_start():
     append_log('start listen local')
     local = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    local.bind(('127.0.0.1', 7777))
+    local.bind(('localhost', 7777))
     local.listen(20)
 
     while True:
@@ -21,15 +23,18 @@ def listen_start():
 
 def check_auth():
     ok = False
-    proxy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         with open('config.json', 'r') as f:
             auth = json.load(f)
             for u in auth:
                 if bool(u['used']):
-                    lg = '{0};_;_;{1}'.format(u['name'], u['pwd'])
+                    family = socket.AF_INET
+                    if (u['ipv?']) == 6:
+                        family = socket.AF_INET6
+                    proxy = socket.socket(family, socket.SOCK_STREAM)
                     proxy.connect((u['ip'], u['port']))
-                    proxy.sendall(lg.encode())
+                    token = '{0};_;_;{1}'.format(u['name'], u['pwd'])
+                    proxy.sendall(token.encode())
                     if proxy.recv(1) == b'1':
                         return proxy
         return None
@@ -40,13 +45,15 @@ def check_auth():
 
 def send_header(client):
     try:
-        header = client.recv(1024)
+        header = client.recv(BUFFER_SIZE)
         if not header:
+            client.close()
             return
 
         proxy = check_auth()
         if not proxy:
-            append_log('auth failed')
+            client.close()
+            append_log('proxy auth failed')
             return
 
         proxy.sendall(header)
@@ -66,16 +73,15 @@ def send_header(client):
 
 def bridge(recver, sender):
     try:
-        data = recver.recv(1024)
+        data = recver.recv(BUFFER_SIZE)
         while data:
             sender.sendall(data)
-            data = recver.recv(1024)
+            data = recver.recv(BUFFER_SIZE)
     except Exception as ex:
         append_log(str(ex))
     finally:
         recver.close()
         sender.close()
-        append_log('bridge close')
 
 
 def append_log(msg):
