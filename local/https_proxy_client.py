@@ -1,12 +1,31 @@
 import socket
 import json
+import time
 from datetime import datetime
 from threading import Thread
+from proxy_setting import *
 
 BUFFER_SIZE = 4096
 
 
+def run_proxy():
+    set_proxy()
+    back = Thread(target=back_proxy_setting)
+    back.setDaemon(True)
+    back.start()
+
+    listen_start()
+
+
+def back_proxy_setting():
+    input('input any key to exit\n')
+    back_proxy()
+    import os
+    os._exit(0)
+
+
 def listen_start():
+    time.sleep(1)
     append_log('start listen local')
     local = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     local.bind(('localhost', 7777))
@@ -92,4 +111,4 @@ def append_log(msg):
 
 
 if __name__ == '__main__':
-    listen_start()
+    run_proxy()
