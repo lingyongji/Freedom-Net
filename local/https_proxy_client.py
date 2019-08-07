@@ -41,14 +41,13 @@ def listen_start():
 
 
 def check_auth():
-    ok = False
     try:
         with open('config.json', 'r') as f:
             auth = json.load(f)
             for u in auth:
                 if bool(u['used']):
                     family = socket.AF_INET
-                    if (u['ipv?']) == 6:
+                    if (u['ipv']) == 6:
                         family = socket.AF_INET6
                     proxy = socket.socket(family, socket.SOCK_STREAM)
                     proxy.connect((u['ip'], u['port']))

@@ -71,20 +71,40 @@ def recv_header(auth_checker, addr):
         if not client:
             return
 
-        header = client.recv(BUFFER_SIZE).decode()
-        headerItems = header.split('\r\n')
-
-        connect_index = headerItems[0].find('CONNECT')
-        if connect_index < 0:
-            client.close()
-            return
-
-        host = headerItems[0][connect_index+8:].split(':')[0]
         service = socket.socket(client.family, socket.SOCK_STREAM)
-        service.connect((host, 443))
-        client.sendall(b'HTTP/1.0 200 Connection Established\r\n\r\n')
-        append_log('connect to [{0}]'.format(host))
+        header = client.recv(BUFFER_SIZE).decode()
+        header_items = header.split('\r\n')
 
+        connect_index = header_items[0].find('CONNECT')
+        if connect_index < 0: # http proxy
+            host_index = header.find('Host:')
+            get_index = header.find('GET http')
+            post_index = header.find('POST http')
+            if host_index > -1:
+                rn_index = header.find('\r\n',host_index)
+                host = header[host_index+6:rn_index]
+            elif get_index > -1 or post_index > -1:
+                host = header.split('/')[2]
+            else:
+                client.close()
+                append_log('host parsing failed')
+                return
+
+            host_items = host.split(':')
+            host = host_items[0]
+            if len(host_items) == 2:
+                port = host_items[1]
+            else:
+                port = 80
+            service.connect((host,int(port)))
+            service.sendall(header.encode())
+
+        else: # https proxy
+            host = header_items[0][connect_index+8:].split(':')[0]
+            service.connect((host, 443))
+            client.sendall(b'HTTP/1.0 200 Connection Established\r\n\r\n')
+
+        append_log('connect to [{0}]'.format(host))
         bridge1 = Thread(target=bridge, args=[client, service])
         bridge2 = Thread(target=bridge, args=[service, client])
         bridge1.setDaemon(True)

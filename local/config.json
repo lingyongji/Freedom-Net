@@ -1,6 +1,6 @@
 [
 	{
-		"ipv?": 4,
+		"ipv": 4,
 		"ip": "localhost",
 		"port": 8888,
 		"name": "admin",
@@ -8,7 +8,7 @@
 		"used": true
 	},
 	{
-		"ipv?": 6,
+		"ipv": 6,
 		"ip": "::",
 		"port": 8889,
 		"name": "admin",
