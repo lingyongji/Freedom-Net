@@ -33,19 +33,19 @@ def listen_start():
 
     while True:
         client, addr = local.accept()
-        # append_log('connect to {0}:{1}'.format(addr[0], addr[1]))
+        append_log('connect to {0}:{1}'.format(addr[0], addr[1]))
 
         header_recver = Thread(target=send_header, args=[client])
         header_recver.setDaemon(True)
         header_recver.start()
 
 
-def check_auth():
+def check_auth(ip_type):
     try:
-        with open('config.json', 'r') as f:
+        with open('client_config.json', 'r') as f:
             auth = json.load(f)
             for u in auth:
-                if bool(u['used']):
+                if bool(u['used']) and u['ipv'] == ip_type:
                     family = socket.AF_INET
                     if (u['ipv']) == 6:
                         family = socket.AF_INET6
@@ -61,6 +61,18 @@ def check_auth():
         proxy.close()
 
 
+def check_host(header):
+    header_items = header.decode().split('\r\n')
+    connect_index = header_items[0].find('CONNECT')
+    if connect_index >= 0:
+        host = header_items[0][connect_index+8:].split(':')[0]
+        with open('ipv6s.txt', 'r') as f:
+            for i in f:
+                if host.find(str(i).strip()) >= 0:
+                    return 6
+    return 4
+
+
 def send_header(client):
     try:
         header = client.recv(BUFFER_SIZE)
@@ -68,7 +80,9 @@ def send_header(client):
             client.close()
             return
 
-        proxy = check_auth()
+        ip_type = check_host(header)
+
+        proxy = check_auth(ip_type)
         if not proxy:
             client.close()
             append_log('proxy auth failed')
@@ -104,8 +118,8 @@ def bridge(recver, sender):
 
 def append_log(msg):
     dt = str(datetime.now())
-    print(dt + ' | ' + msg)
-    with open('log.txt', 'a') as f:
+    # print(dt + ' | ' + msg)
+    with open('log_client.txt', 'a') as f:
         f.write(dt + ' | ' + msg + '\n')
 
 

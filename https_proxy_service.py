@@ -50,7 +50,7 @@ def proxy_listen(proxy):
 def check_auth(client, addr):
     try:
         token = client.recv(50).decode().split(';_;_;')
-        with open('auth.json', 'r') as f:
+        with open('proxy_auth.json', 'r') as f:
             auth = json.load(f)
         for u in auth:
             if u['name'] == token[0] and u['pwd'] == token[1]:
@@ -76,12 +76,12 @@ def recv_header(auth_checker, addr):
         header_items = header.split('\r\n')
 
         connect_index = header_items[0].find('CONNECT')
-        if connect_index < 0: # http proxy
+        if connect_index < 0:  # http proxy
             host_index = header.find('Host:')
             get_index = header.find('GET http')
             post_index = header.find('POST http')
             if host_index > -1:
-                rn_index = header.find('\r\n',host_index)
+                rn_index = header.find('\r\n', host_index)
                 host = header[host_index+6:rn_index]
             elif get_index > -1 or post_index > -1:
                 host = header.split('/')[2]
@@ -96,10 +96,10 @@ def recv_header(auth_checker, addr):
                 port = host_items[1]
             else:
                 port = 80
-            service.connect((host,int(port)))
+            service.connect((host, int(port)))
             service.sendall(header.encode())
 
-        else: # https proxy
+        else:  # https proxy
             host = header_items[0][connect_index+8:].split(':')[0]
             service.connect((host, 443))
             client.sendall(b'HTTP/1.0 200 Connection Established\r\n\r\n')
@@ -134,7 +134,7 @@ def bridge(recver, sender):
 def append_log(msg):
     dt = str(datetime.now())
     # print(dt + ' | ' + msg)
-    with open('log.txt', 'a') as f:
+    with open('log_proxy.txt', 'a') as f:
         f.write(dt + ' | ' + msg + '\n')
 
 
