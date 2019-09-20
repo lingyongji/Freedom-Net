@@ -3,7 +3,7 @@ import json
 import time
 from datetime import datetime
 from threading import Thread
-from proxy_setting import *
+from win_proxy_setting import *
 
 BUFFER_SIZE = 4096
 
@@ -42,7 +42,7 @@ def listen_start():
 
 def check_auth(ip_type):
     try:
-        with open('client_config.json', 'r') as f:
+        with open('config_client_vps.json', 'r') as f:
             auth = json.load(f)
             for u in auth:
                 if bool(u['used']) and u['ipv'] == ip_type:
@@ -119,7 +119,7 @@ def bridge(recver, sender):
 def append_log(msg):
     dt = str(datetime.now())
     # print(dt + ' | ' + msg)
-    with open('log_client.txt', 'a') as f:
+    with open('log_client.log', 'a') as f:
         f.write(dt + ' | ' + msg + '\n')
 
 

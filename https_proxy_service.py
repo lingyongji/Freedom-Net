@@ -50,7 +50,7 @@ def proxy_listen(proxy):
 def check_auth(client, addr):
     try:
         token = client.recv(50).decode().split(';_;_;')
-        with open('proxy_auth.json', 'r') as f:
+        with open('config_proxy_auth.json', 'r') as f:
             auth = json.load(f)
         for u in auth:
             if u['name'] == token[0] and u['pwd'] == token[1]:
@@ -134,7 +134,7 @@ def bridge(recver, sender):
 def append_log(msg):
     dt = str(datetime.now())
     # print(dt + ' | ' + msg)
-    with open('log_proxy.txt', 'a') as f:
+    with open('log_proxy.log', 'a') as f:
         f.write(dt + ' | ' + msg + '\n')
 
 

@@ -9,7 +9,7 @@
 	},
 	{
 		"ipv": 6,
-		"ip": "2001:19f0:5:6fdd:5400:02ff:fe48:d9bb",
+		"ip": "::",
 		"port": 8889,
 		"name": "admin",
 		"pwd": "admin",
