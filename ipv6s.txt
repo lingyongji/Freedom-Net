@@ -3,3 +3,5 @@ youtube.com
 googlevideo.com
 ytimg.com
 ggpht.com
+y2mate.com
+facebook.com
