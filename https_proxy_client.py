@@ -62,14 +62,30 @@ def check_auth(aim):
 
 
 def check_aim(header):
-    header_items = header.decode().split('\r\n')
+    header_items = header.split('\r\n')
     connect_index = header_items[0].find('CONNECT')
-    if connect_index >= 0:
+    if connect_index < 0:  # http proxy
+        host_index = header.find('Host:')
+        get_index = header.find('GET http')
+        post_index = header.find('POST http')
+        if host_index > -1:
+            rn_index = header.find('\r\n', host_index)
+            host = header[host_index+6:rn_index]
+        elif get_index > -1 or post_index > -1:
+            host = header.split('/')[2]
+        else:
+            append_log('host parsing failed')
+            return
+
+        host_items = host.split(':')
+        host = host_items[0]
+    else:  # https proxy
         host = header_items[0][connect_index+8:].split(':')[0]
-        with open('ip.txt', 'r') as f:
-            for i in f:
-                if host.find(str(i).strip()) >= 0:
-                    return "vps"
+
+    with open('ip.txt', 'r') as f:
+        for i in f:
+            if host.find(str(i).strip()) >= 0:
+                return 'vps'
     return 'local'
 
 
@@ -80,7 +96,9 @@ def send_header(client):
             client.close()
             return
 
-        aim = check_aim(header)
+        aim = check_aim(header.decode())
+        if not aim:
+            return
 
         proxy = check_auth(aim)
         if not proxy:
