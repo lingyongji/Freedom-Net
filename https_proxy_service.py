@@ -3,7 +3,10 @@ import json
 import time
 from datetime import datetime
 from threading import Thread
+import sys
+import getopt
 
+service_iptype = 4
 listen_addr_ipv4 = ('0.0.0.0', 8888)
 listen_addr_ipv6 = ('::', 8889)
 BUFFER_SIZE = 4096
@@ -71,7 +74,10 @@ def recv_header(auth_checker, addr):
         if not client:
             return
 
-        service = socket.socket(client.family, socket.SOCK_STREAM)
+        family = client.family
+        if service_iptype == 4:
+            family = socket.AF_INET
+        service = socket.socket(family, socket.SOCK_STREAM)
         header = client.recv(BUFFER_SIZE).decode()
         header_items = header.split('\r\n')
 
@@ -139,4 +145,14 @@ def append_log(msg):
 
 
 if __name__ == '__main__':
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], 'hi:', ['help=', 'ipv='])
+    except getopt.GetoptError:
+        print('-i <ip version>')
+    for opt, arg in opts:
+        if opt in ('-h', '--help'):
+            print('-i <input ip version')
+            sys.exit()
+        if opt in ('-i', '--ipv'):
+            service_iptype = int(arg)
     listen_start()

@@ -1,2 +1,0 @@
-#!/bin/bash
-nohup python3 https_proxy_service.py > log.txt 2>&1 &

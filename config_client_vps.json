@@ -1,5 +1,6 @@
 [
 	{
+		"type": "local",
 		"ipv": 4,
 		"ip": "localhost",
 		"port": 8888,
@@ -8,6 +9,7 @@
 		"used": true
 	},
 	{
+		"type": "vps",
 		"ipv": 6,
 		"ip": "::",
 		"port": 8889,

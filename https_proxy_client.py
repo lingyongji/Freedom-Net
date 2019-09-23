@@ -40,12 +40,12 @@ def listen_start():
         header_recver.start()
 
 
-def check_auth(ip_type):
+def check_auth(aim):
     try:
         with open('config_client_vps.json', 'r') as f:
             auth = json.load(f)
             for u in auth:
-                if bool(u['used']) and u['ipv'] == ip_type:
+                if bool(u['used']) and u['type'] == aim:
                     family = socket.AF_INET
                     if (u['ipv']) == 6:
                         family = socket.AF_INET6
@@ -61,16 +61,16 @@ def check_auth(ip_type):
         proxy.close()
 
 
-def check_host(header):
+def check_aim(header):
     header_items = header.decode().split('\r\n')
     connect_index = header_items[0].find('CONNECT')
     if connect_index >= 0:
         host = header_items[0][connect_index+8:].split(':')[0]
-        with open('ipv6s.txt', 'r') as f:
+        with open('ip.txt', 'r') as f:
             for i in f:
                 if host.find(str(i).strip()) >= 0:
-                    return 6
-    return 4
+                    return "vps"
+    return 'local'
 
 
 def send_header(client):
@@ -80,9 +80,9 @@ def send_header(client):
             client.close()
             return
 
-        ip_type = check_host(header)
+        aim = check_aim(header)
 
-        proxy = check_auth(ip_type)
+        proxy = check_auth(aim)
         if not proxy:
             client.close()
             append_log('proxy auth failed')
