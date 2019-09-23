@@ -146,12 +146,12 @@ def append_log(msg):
 
 if __name__ == '__main__':
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'hi:', ['help=', 'ipv='])
+        opts, args = getopt.getopt(sys.argv[1:], 'hi:', ['help', 'ipv='])
     except getopt.GetoptError:
         print('-i <ip version>')
     for opt, arg in opts:
         if opt in ('-h', '--help'):
-            print('-i <input ip version')
+            print('-i <input ip version>')
             sys.exit()
         if opt in ('-i', '--ipv'):
             service_iptype = int(arg)
