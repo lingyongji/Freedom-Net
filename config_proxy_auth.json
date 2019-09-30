@@ -2,9 +2,5 @@
 	{
 		"name": "admin",
 		"pwd": "admin"
-	},
-	{
-		"name": "admin2",
-		"pwd": "admin2"
 	}
 ]

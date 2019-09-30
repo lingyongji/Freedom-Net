@@ -1,20 +1,18 @@
 [
 	{
-		"type": "local",
 		"ipv": 4,
-		"ip": "localhost",
+		"ip": "x.x.x.x",
 		"port": 8888,
 		"name": "admin",
 		"pwd": "admin",
-		"used": true
+		"used": false
 	},
 	{
-		"type": "vps",
 		"ipv": 6,
 		"ip": "::",
 		"port": 8889,
 		"name": "admin",
 		"pwd": "admin",
-		"used": true
+		"used": false
 	}
 ]
