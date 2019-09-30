@@ -29,6 +29,7 @@ class Client(object):
     def back_proxy_setting(self):
         input('input any key to exit\n')
         back_proxy_config()
+        self.append_log('client closed')
         import os
         os._exit(0)
 
@@ -95,11 +96,13 @@ class Client(object):
             else:  # https proxy
                 host = header_items[0][connect_index+8:].split(':')[0]
 
-            self.append_log('request connect {0}'.format(host))
             with open('ip.txt', 'r') as f:
                 for i in f:
                     if host.find(str(i).strip()) >= 0:
+                        self.append_log(
+                            'request connect {0} by vps'.format(host))
                         return 'vps'
+            self.append_log('connect {0} by local'.format(host))
             return 'local'
         except Exception as ex:
             self.append_log(ex, sys._getframe().f_code.co_name)
