@@ -102,7 +102,6 @@ class Client(object):
                         self.append_log(
                             'request connect {0} by vps'.format(host))
                         return 'vps'
-            self.append_log('connect {0} by local'.format(host))
             return 'local'
         except Exception as ex:
             self.append_log(ex, sys._getframe().f_code.co_name)
