@@ -5,6 +5,7 @@ from datetime import datetime
 from threading import Thread
 from win_proxy_setting import *
 from https_proxy_service import Proxy
+import sys
 
 BUFFER_SIZE = 4096
 # local proxy, connect host which not in ip.txt
@@ -54,7 +55,6 @@ class Client(object):
                     return proxy
                 else:
                     proxy.close()
-                    return None
             else:
                 with open('config_client_vps.json', 'r') as f:
                     auth = json.load(f)
@@ -71,10 +71,8 @@ class Client(object):
                             return proxy
                         else:
                             proxy.close()
-                
-                return False
         except Exception as ex:
-            self.append_log(ex)
+            self.append_log(ex, sys._getframe().f_code.co_name)
 
     def check_aim(self, header):
         try:
@@ -91,21 +89,20 @@ class Client(object):
                     host = header.split('/')[2]
                 else:
                     self.append_log('host parsing failed')
-                    return
 
                 host_items = host.split(':')
                 host = host_items[0]
             else:  # https proxy
                 host = header_items[0][connect_index+8:].split(':')[0]
 
+            self.append_log('request connect {0}'.format(host))
             with open('ip.txt', 'r') as f:
                 for i in f:
                     if host.find(str(i).strip()) >= 0:
                         return 'vps'
             return 'local'
         except Exception as ex:
-            self.append_log(ex)
-            return None
+            self.append_log(ex, sys._getframe().f_code.co_name)
 
     def send_header(self, client):
         try:
@@ -129,7 +126,8 @@ class Client(object):
         except Exception as ex:
             proxy.close()
             client.close()
-            self.append_log(ex)
+            self.append_log(ex, sys._getframe().f_code.co_name)
+            return
 
         bridge1 = Thread(target=self.bridge, args=[client, proxy])
         bridge2 = Thread(target=self.bridge, args=[proxy, client])
@@ -140,21 +138,21 @@ class Client(object):
 
     def bridge(self, recver, sender):
         try:
-            data = recver.recv(BUFFER_SIZE)
-            while data:
-                sender.sendall(data)
+            while True:
                 data = recver.recv(BUFFER_SIZE)
+                if not data:
+                    break
+                sender.sendall(data)
         except Exception as ex:
-            self.append_log(ex)
+            self.append_log(ex, sys._getframe().f_code.co_name)
         finally:
             recver.close()
             sender.close()
 
-    def append_log(self, msg):
+    def append_log(self, msg, func_name=''):
         dt = str(datetime.now())
-        # print(dt + ' | ' + msg)
         with open('proxy.log', 'a') as f:
-            f.write('client | ' + dt + ' | ' + str(msg) + '\n')
+            f.write('{0} |C| {1} | {2} \n'.format(dt, str(msg), func_name))
 
 
 if __name__ == '__main__':

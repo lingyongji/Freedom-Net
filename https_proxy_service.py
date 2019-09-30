@@ -28,7 +28,7 @@ class Proxy(object):
             listener_v4.setDaemon(True)
             listener_v4.start()
         except Exception as ex:
-            self.append_log(ex)
+            self.append_log(ex, sys._getframe().f_code.co_name)
 
         try:
             proxy_v6 = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
@@ -37,7 +37,7 @@ class Proxy(object):
             listener_v6.setDaemon(True)
             listener_v6.start()
         except Exception as ex:
-            self.append_log(ex)
+            self.append_log(ex, sys._getframe().f_code.co_name)
 
         hours = 1
         while True:
@@ -49,7 +49,6 @@ class Proxy(object):
         proxy.listen(10)
         while True:
             client, addr = proxy.accept()
-            # self.append_log('connect to {0}:{1}'.format(addr[0], addr[1]))
 
             run_recv = Thread(target=self.recv_header, args=[client, addr])
             run_recv.setDaemon(True)
@@ -72,9 +71,8 @@ class Proxy(object):
                 client.sendall(b'0')
                 client.close()
                 self.append_log('{0}:{1} auth failed'.format(addr[0], addr[1]))
-                return None
         except Exception as ex:
-            self.append_log(ex)
+            self.append_log(ex, sys._getframe().f_code.co_name)
             client.close()
 
     def recv_header(self, client, addr):
@@ -91,6 +89,7 @@ class Proxy(object):
             header_items = header.split('\r\n')
 
             connect_index = header_items[0].find('CONNECT')
+            host = ''
             if connect_index < 0:  # http proxy
                 host_index = header.find('Host:')
                 get_index = header.find('GET http')
@@ -111,18 +110,23 @@ class Proxy(object):
                     port = host_items[1]
                 else:
                     port = 80
+
                 service.connect((host, int(port)))
                 service.sendall(header.encode())
 
             else:  # https proxy
                 host = header_items[0][connect_index+8:].split(':')[0]
+
                 service.connect((host, 443))
                 client.sendall(b'HTTP/1.0 200 Connection Established\r\n\r\n')
 
         except Exception as ex:
             service.close()
             client.close()
-            self.append_log(ex)
+            self.append_log(str(ex) + host, sys._getframe().f_code.co_name)
+            return
+
+        self.append_log('connect to [{0}]'.format(host))
 
         bridge1 = Thread(target=self.bridge, args=[client, service])
         bridge2 = Thread(target=self.bridge, args=[service, client])
@@ -133,21 +137,21 @@ class Proxy(object):
 
     def bridge(self, recver, sender):
         try:
-            data = recver.recv(BUFFER_SIZE)
-            while data:
-                sender.sendall(data)
+            while True:
                 data = recver.recv(BUFFER_SIZE)
+                if not data:
+                    break
+                sender.sendall(data)
         except Exception as ex:
-            self.append_log(ex)
+            self.append_log(ex, sys._getframe().f_code.co_name)
         finally:
             recver.close()
             sender.close()
 
-    def append_log(self, msg):
+    def append_log(self, msg, func_name=''):
         dt = str(datetime.now())
-        # print(dt + ' | ' + msg)
         with open('proxy.log', 'a') as f:
-            f.write('server | ' + dt + ' | ' + str(msg) + '\n')
+            f.write('{0} |S| {1} | {2} \n'.format(dt, str(msg), func_name))
 
 
 if __name__ == '__main__':
