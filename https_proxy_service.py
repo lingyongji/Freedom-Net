@@ -6,16 +6,21 @@ from threading import Thread
 import sys
 import getopt
 
-ip_version = 4
-LISTEN_IPV4 = ('0.0.0.0', 8888)
-LISTEN_IPV6 = ('::', 8889)
 BUFFER_SIZE = 4096
+
+LISTENER_IPV4 = ('0.0.0.0', 8888)
+LISTENER_IPV6 = ('::', 8889)
+
+AIM_LOCAL = 1
+AIM_PROXY = 2
+
+ip_version = 4
 
 
 class Proxy(object):
 
     def __init__(self):
-        self.server_mode = 'vps'
+        self.server_mode = AIM_PROXY
 
     def run_proxy(self, mode):
         self.append_log('proxy start')
@@ -23,7 +28,7 @@ class Proxy(object):
 
         try:
             proxy_v4 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            proxy_v4.bind(LISTEN_IPV4)
+            proxy_v4.bind(LISTENER_IPV4)
             listener_v4 = Thread(target=self.proxy_listen, args=[proxy_v4])
             listener_v4.setDaemon(True)
             listener_v4.start()
@@ -32,7 +37,7 @@ class Proxy(object):
 
         try:
             proxy_v6 = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-            proxy_v6.bind(LISTEN_IPV6)
+            proxy_v6.bind(LISTENER_IPV6)
             listener_v6 = Thread(target=self.proxy_listen, args=[proxy_v6])
             listener_v6.setDaemon(True)
             listener_v6.start()
@@ -46,36 +51,15 @@ class Proxy(object):
             hours += 1
 
     def proxy_listen(self, proxy):
-        proxy.listen(10)
+        proxy.listen(20)
         while True:
             client, addr = proxy.accept()
 
-            run_recv = Thread(target=self.recv_header, args=[client, addr])
-            run_recv.setDaemon(True)
-            run_recv.start()
+            req_send = Thread(target=self.send_request, args=[client, addr])
+            req_send.setDaemon(True)
+            req_send.start()
 
-    def check_auth(self, client, addr):
-        try:
-            if self.server_mode == 'local':
-                if client.recv(1) == b'1':
-                    client.sendall(b'1')
-                    return client
-            else:
-                token = client.recv(50).decode().split(';_;_;')
-                with open('config_proxy_auth.json', 'r') as f:
-                    auth = json.load(f)
-                for u in auth:
-                    if u['name'] == token[0] and u['pwd'] == token[1]:
-                        client.sendall(b'1')
-                        return client
-                client.sendall(b'0')
-                client.close()
-                self.append_log('{0}:{1} auth failed'.format(addr[0], addr[1]))
-        except Exception as ex:
-            self.append_log(ex, sys._getframe().f_code.co_name)
-            client.close()
-
-    def recv_header(self, client, addr):
+    def send_request(self, client, addr):
         try:
             client = self.check_auth(client, addr)
             if not client:
@@ -85,9 +69,9 @@ class Proxy(object):
             if ip_version == 4:
                 family = socket.AF_INET
             service = socket.socket(family, socket.SOCK_STREAM)
+
             header = client.recv(BUFFER_SIZE).decode()
             header_items = header.split('\r\n')
-
             connect_index = header_items[0].find('CONNECT')
             host = ''
             if connect_index < 0:  # http proxy
@@ -121,32 +105,52 @@ class Proxy(object):
                 client.sendall(b'HTTP/1.0 200 Connection Established\r\n\r\n')
 
         except Exception as ex:
-            service.close()
-            client.close()
             self.append_log(str(ex) + host, sys._getframe().f_code.co_name)
+            client.close()
             return
 
         self.append_log('connect to [{0}]'.format(host))
 
-        bridge1 = Thread(target=self.bridge, args=[client, service])
-        bridge2 = Thread(target=self.bridge, args=[service, client])
+        bridge1 = Thread(target=self.bridge, args=[client, service, False])
+        bridge2 = Thread(target=self.bridge, args=[service, client, True])
         bridge1.setDaemon(True)
         bridge2.setDaemon(True)
         bridge1.start()
         bridge2.start()
 
-    def bridge(self, recver, sender):
+    def check_auth(self, client, addr):
+        try:
+            if self.server_mode == AIM_LOCAL:
+                if client.recv(1) == b'1':
+                    client.sendall(b'1')
+                    return client
+            else:
+                token = client.recv(50).decode().split(';_;_;')
+                with open('config_proxy_auth.json', 'r') as f:
+                    auth = json.load(f)
+                for u in auth:
+                    if u['name'] == token[0] and u['pwd'] == token[1]:
+                        client.sendall(b'1')
+                        return client
+                client.sendall(b'0')
+                client.close()
+                self.append_log('{0}:{1} auth failed'.format(addr[0], addr[1]))
+        except Exception as ex:
+            self.append_log(ex, sys._getframe().f_code.co_name)
+            client.close()
+
+    def bridge(self, recver, sender, s_to_c):
         try:
             while True:
                 data = recver.recv(BUFFER_SIZE)
                 if not data:
+                    if s_to_c:
+                        recver.close()
+                        sender.sendall(b'')
                     break
                 sender.sendall(data)
         except Exception as ex:
             self.append_log(ex, sys._getframe().f_code.co_name)
-        finally:
-            recver.close()
-            sender.close()
 
     def append_log(self, msg, func_name=''):
         dt = str(datetime.now())
@@ -166,4 +170,4 @@ if __name__ == '__main__':
         if opt in ('-i', '--ipv'):
             ip_version = int(arg)
 
-    Proxy().run_proxy('vps')
+    Proxy().run_proxy(AIM_PROXY)

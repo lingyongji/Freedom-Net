@@ -1,5 +1,4 @@
 import ctypes
-import json
 import winreg
 
 INTERNET_OPTION_SETTINGS_CHANGED = 39

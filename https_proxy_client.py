@@ -1,6 +1,5 @@
 import socket
 import json
-import time
 from datetime import datetime
 from threading import Thread
 from win_proxy_setting import *
@@ -8,8 +7,12 @@ from https_proxy_service import Proxy
 import sys
 
 BUFFER_SIZE = 4096
-# local proxy, connect host which not in ip.txt
+
+LISTENER = ('localhost', 7777)
 LOCAL_PROXY = ('localhost', 8888)
+
+AIM_LOCAL = 1
+AIM_PROXY = 2
 
 
 class Client(object):
@@ -24,7 +27,7 @@ class Client(object):
         run_client.setDaemon(True)
         run_client.start()
 
-        Proxy().run_proxy('local')
+        Proxy().run_proxy(AIM_LOCAL)
 
     def back_proxy_setting(self):
         input('input any key to exit\n')
@@ -36,44 +39,47 @@ class Client(object):
     def client_listen(self):
         self.append_log('client start')
         local = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        local.bind(('localhost', 7777))
+        local.bind(LISTENER)
         local.listen(20)
 
         while True:
             client, addr = local.accept()
 
-            header_recver = Thread(target=self.send_header, args=[client])
-            header_recver.setDaemon(True)
-            header_recver.start()
+            req_send = Thread(target=self.send_request, args=[client])
+            req_send.setDaemon(True)
+            req_send.start()
 
-    def get_proxy(self, aim):
+    def send_request(self, client):
+        request = client.recv(BUFFER_SIZE)
+        if not request:
+            client.close()
+            return
+
+        proxy_aim = self.check_aim(request.decode())
+        if not proxy_aim:
+            client.close()
+            return
+
+        proxy = self.connect_proxy(proxy_aim)
+        if not proxy:
+            client.close()
+            self.append_log('connect proxy failed')
+            return
+
         try:
-            if aim == 'local':
-                proxy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                proxy.connect(LOCAL_PROXY)
-                proxy.sendall(b'1')
-                if proxy.recv(1) == b'1':
-                    return proxy
-                else:
-                    proxy.close()
-            else:
-                with open('config_client_vps.json', 'r') as f:
-                    auth = json.load(f)
-                for u in auth:
-                    if bool(u['used']):
-                        family = socket.AF_INET
-                        if (u['ipv']) == 6:
-                            family = socket.AF_INET6
-                        proxy = socket.socket(family, socket.SOCK_STREAM)
-                        proxy.connect((u['ip'], u['port']))
-                        token = '{0};_;_;{1}'.format(u['name'], u['pwd'])
-                        proxy.sendall(token.encode())
-                        if proxy.recv(1) == b'1':
-                            return proxy
-                        else:
-                            proxy.close()
+            proxy.sendall(request)
+
         except Exception as ex:
             self.append_log(ex, sys._getframe().f_code.co_name)
+            client.close()
+            return
+
+        bridge1 = Thread(target=self.bridge, args=[client, proxy, False])
+        bridge2 = Thread(target=self.bridge, args=[proxy, client, True])
+        bridge1.setDaemon(True)
+        bridge2.setDaemon(True)
+        bridge1.start()
+        bridge2.start()
 
     def check_aim(self, header):
         try:
@@ -97,59 +103,57 @@ class Client(object):
                 host = header_items[0][connect_index+8:].split(':')[0]
 
             with open('ip.txt', 'r') as f:
-                for i in f:
-                    if host.find(str(i).strip()) >= 0:
-                        self.append_log(
-                            'request connect {0} by vps'.format(host))
-                        return 'vps'
-            return 'local'
+                for ip in f:
+                    if host.find(str(ip).strip()) >= 0:
+                        self.append_log('request {0} by proxy'.format(host))
+                        return AIM_PROXY
+            return AIM_LOCAL
         except Exception as ex:
             self.append_log(ex, sys._getframe().f_code.co_name)
+            return False
 
-    def send_header(self, client):
+    def connect_proxy(self, proxy_aim):
         try:
-            header = client.recv(BUFFER_SIZE)
-            if not header:
-                client.close()
-                return
-
-            aim = self.check_aim(header.decode())
-            if not aim:
-                return
-
-            proxy = self.get_proxy(aim)
-            if not proxy:
-                client.close()
-                self.append_log('get proxy failed')
-                return
-
-            proxy.sendall(header)
-
+            if proxy_aim == AIM_LOCAL:
+                proxy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                proxy.connect(LOCAL_PROXY)
+                proxy.sendall(b'1')
+                if proxy.recv(1) == b'1':
+                    return proxy
+                else:
+                    proxy.close()
+                    return False
+            else:
+                with open('config_client_vps.json', 'r') as f:
+                    auth = json.load(f)
+                for u in auth:
+                    if bool(u['used']):
+                        family = socket.AF_INET
+                        if (u['ipv']) == 6:
+                            family = socket.AF_INET6
+                        proxy = socket.socket(family, socket.SOCK_STREAM)
+                        proxy.connect((u['ip'], u['port']))
+                        token = '{0};_;_;{1}'.format(u['name'], u['pwd'])
+                        proxy.sendall(token.encode())
+                        if proxy.recv(1) == b'1':
+                            return proxy
+                        else:
+                            self.append_log('{0} auth failed'.format(['ip']))
+                            proxy.close()
+                return False
         except Exception as ex:
-            proxy.close()
-            client.close()
             self.append_log(ex, sys._getframe().f_code.co_name)
-            return
 
-        bridge1 = Thread(target=self.bridge, args=[client, proxy])
-        bridge2 = Thread(target=self.bridge, args=[proxy, client])
-        bridge1.setDaemon(True)
-        bridge2.setDaemon(True)
-        bridge1.start()
-        bridge2.start()
-
-    def bridge(self, recver, sender):
+    def bridge(self, recver, sender, s_to_c):
         try:
             while True:
                 data = recver.recv(BUFFER_SIZE)
-                if not data:
+                if data == b'':
+                    recver.close()
                     break
                 sender.sendall(data)
         except Exception as ex:
             self.append_log(ex, sys._getframe().f_code.co_name)
-        finally:
-            recver.close()
-            sender.close()
 
     def append_log(self, msg, func_name=''):
         dt = str(datetime.now())
