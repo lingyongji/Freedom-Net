@@ -2,17 +2,12 @@ import socket
 import json
 from datetime import datetime
 from threading import Thread
-from win_proxy_setting import *
-from https_proxy_service import Proxy
+from win_proxy_setting import set_proxy_config, back_proxy_config
+from https_proxy_service import Proxy, BUFFER_SIZE, AIM_LOCAL, AIM_PROXY
 import sys
-
-BUFFER_SIZE = 4096
 
 LISTENER = ('localhost', 7777)
 LOCAL_PROXY = ('localhost', 8888)
-
-AIM_LOCAL = 1
-AIM_PROXY = 2
 
 
 class Client(object):
