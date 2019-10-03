@@ -105,14 +105,15 @@ class Proxy(object):
                 client.sendall(b'HTTP/1.0 200 Connection Established\r\n\r\n')
 
         except Exception as ex:
-            self.append_log(str(ex) + host, sys._getframe().f_code.co_name)
+            msg = str(ex) + ' | ' + host
+            self.append_log(msg, sys._getframe().f_code.co_name)
             client.close()
             return
 
         self.append_log('connect to [{0}]'.format(host))
 
-        bridge1 = Thread(target=self.bridge, args=[client, service, False])
-        bridge2 = Thread(target=self.bridge, args=[service, client, True])
+        bridge1 = Thread(target=self.bridge, args=[client, service, True])
+        bridge2 = Thread(target=self.bridge, args=[service, client, False])
         bridge1.setDaemon(True)
         bridge2.setDaemon(True)
         bridge1.start()
@@ -132,25 +133,27 @@ class Proxy(object):
                     if u['name'] == token[0] and u['pwd'] == token[1]:
                         client.sendall(b'1')
                         return client
-                client.sendall(b'0')
                 client.close()
                 self.append_log('{0}:{1} auth failed'.format(addr[0], addr[1]))
         except Exception as ex:
             self.append_log(ex, sys._getframe().f_code.co_name)
             client.close()
 
-    def bridge(self, recver, sender, s_to_c):
+    def bridge(self, recver, sender, c_to_s):
         try:
             while True:
                 data = recver.recv(BUFFER_SIZE)
                 if not data:
-                    if s_to_c:
+                    if c_to_s:
                         recver.close()
-                        sender.sendall(b'')
+                        sender.close()
                     break
                 sender.sendall(data)
         except Exception as ex:
-            self.append_log(ex, sys._getframe().f_code.co_name)
+            recver.close()
+            sender.close()
+            return
+            # self.append_log(ex, sys._getframe().f_code.co_name)
 
     def append_log(self, msg, func_name=''):
         dt = str(datetime.now())

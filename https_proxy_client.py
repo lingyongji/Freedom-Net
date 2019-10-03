@@ -74,8 +74,8 @@ class Client(object):
             client.close()
             return
 
-        bridge1 = Thread(target=self.bridge, args=[client, proxy, False])
-        bridge2 = Thread(target=self.bridge, args=[proxy, client, True])
+        bridge1 = Thread(target=self.bridge, args=[client, proxy, True])
+        bridge2 = Thread(target=self.bridge, args=[proxy, client, False])
         bridge1.setDaemon(True)
         bridge2.setDaemon(True)
         bridge1.start()
@@ -110,7 +110,6 @@ class Client(object):
             return AIM_LOCAL
         except Exception as ex:
             self.append_log(ex, sys._getframe().f_code.co_name)
-            return False
 
     def connect_proxy(self, proxy_aim):
         try:
@@ -122,7 +121,6 @@ class Client(object):
                     return proxy
                 else:
                     proxy.close()
-                    return False
             else:
                 with open('config_client_vps.json', 'r') as f:
                     auth = json.load(f)
@@ -140,20 +138,24 @@ class Client(object):
                         else:
                             self.append_log('{0} auth failed'.format(['ip']))
                             proxy.close()
-                return False
         except Exception as ex:
             self.append_log(ex, sys._getframe().f_code.co_name)
 
-    def bridge(self, recver, sender, s_to_c):
+    def bridge(self, recver, sender, c_to_s):
         try:
             while True:
                 data = recver.recv(BUFFER_SIZE)
-                if data == b'':
-                    recver.close()
+                if not data:
+                    if c_to_s:
+                        recver.close()
+                        sender.close()
                     break
                 sender.sendall(data)
         except Exception as ex:
-            self.append_log(ex, sys._getframe().f_code.co_name)
+            recver.close()
+            sender.close()
+            return
+            # self.append_log(ex, sys._getframe().f_code.co_name)
 
     def append_log(self, msg, func_name=''):
         dt = str(datetime.now())
