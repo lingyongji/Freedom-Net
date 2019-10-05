@@ -2,18 +2,30 @@ import socket
 import json
 from datetime import datetime
 from threading import Thread
-from win_proxy_setting import set_proxy_config, back_proxy_config, LISTENER
+from win_proxy_setting import set_proxy_config, back_proxy_config
 from https_proxy_service import Proxy, BUFFER_SIZE, AIM_LOCAL, AIM_PROXY
 import sys
 
 
-LOCAL_PROXY = ('localhost', 8888)
-
-
 class Client(object):
 
+    def __init__(self):
+        with open('config_client.json', 'r') as f:
+            config = json.load(f)
+
+        self.vps = config['vps']
+        self.local_proxy_port = config['local_proxy_port']
+        self.all_req_to_vps = config['all_req_to_vps']
+        self.local_listener_port = config['local_listener_port']
+        self.token = config['token']
+
+        self.hosts = []
+        with open('host.txt', 'r') as f:
+            for h in f:
+                self.hosts.append(h)
+
     def run_client(self):
-        set_proxy_config()
+        set_proxy_config(self.local_listener_port)
         back = Thread(target=self.back_proxy_setting)
         back.setDaemon(True)
         back.start()
@@ -34,7 +46,7 @@ class Client(object):
     def client_listen(self):
         self.append_log('client start')
         local = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        local.bind(LISTENER)
+        local.bind(('localhost', self.local_listener_port))
         local.listen(20)
 
         while True:
@@ -50,10 +62,13 @@ class Client(object):
             client.close()
             return
 
-        proxy_aim = self.check_aim(request.decode())
-        if not proxy_aim:
-            client.close()
-            return
+        if bool(self.all_req_to_vps):
+            proxy_aim = AIM_PROXY
+        else:
+            proxy_aim = self.check_aim(request.decode())
+            if not proxy_aim:
+                client.close()
+                return
 
         proxy = self.connect_proxy(proxy_aim)
         if not proxy:
@@ -97,11 +112,11 @@ class Client(object):
             else:  # https proxy
                 host = header_items[0][connect_index+8:].split(':')[0]
 
-            with open('ip.txt', 'r') as f:
-                for ip in f:
-                    if host.find(str(ip).strip()) >= 0:
-                        self.append_log('request {0} by proxy'.format(host))
-                        return AIM_PROXY
+            for h in self.hosts:
+                if host.find(str(h).strip()) >= 0:
+                    self.append_log('request {0} by proxy'.format(host))
+                    return AIM_PROXY
+
             return AIM_LOCAL
         except Exception as ex:
             self.append_log(ex, sys._getframe().f_code.co_name)
@@ -110,24 +125,21 @@ class Client(object):
         try:
             if proxy_aim == AIM_LOCAL:
                 proxy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                proxy.connect(LOCAL_PROXY)
+                proxy.connect(('localhost', self.local_proxy_port))
                 proxy.sendall(b'1')
                 if proxy.recv(1) == b'1':
                     return proxy
                 else:
                     proxy.close()
             else:
-                with open('config_client_vps.json', 'r') as f:
-                    auth = json.load(f)
-                for u in auth:
+                for u in self.vps:
                     if bool(u['used']):
                         family = socket.AF_INET
                         if (u['ipv']) == 6:
                             family = socket.AF_INET6
                         proxy = socket.socket(family, socket.SOCK_STREAM)
                         proxy.connect((u['ip'], u['port']))
-                        token = '{0};_;_;{1}'.format(u['name'], u['pwd'])
-                        proxy.sendall(token.encode())
+                        proxy.sendall(self.token.encode())
                         if proxy.recv(1) == b'1':
                             return proxy
                         else:
@@ -150,7 +162,6 @@ class Client(object):
             recver.close()
             sender.close()
             return
-            # self.append_log(ex, sys._getframe().f_code.co_name)
 
     def append_log(self, msg, func_name=''):
         dt = str(datetime.now())

@@ -7,19 +7,20 @@ import sys
 import getopt
 
 BUFFER_SIZE = 4096
-
-LISTENER_IPV4 = ('0.0.0.0', 8888)
-LISTENER_IPV6 = ('::', 8889)
-
 AIM_LOCAL = 1
 AIM_PROXY = 2
-
 ip_version = 4
 
 
 class Proxy(object):
 
     def __init__(self):
+        with open('config_service.json', 'r') as f:
+            config = json.load(f)
+
+        self.tokens = config['tokens']
+        self.v4_port = config['v4_port']
+        self.v6_port = config['v6_port']
         self.server_mode = AIM_PROXY
 
     def run_proxy(self, mode):
@@ -28,7 +29,7 @@ class Proxy(object):
 
         try:
             proxy_v4 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            proxy_v4.bind(LISTENER_IPV4)
+            proxy_v4.bind(('0.0.0.0', self.v4_port))
             listener_v4 = Thread(target=self.proxy_listen, args=[proxy_v4])
             listener_v4.setDaemon(True)
             listener_v4.start()
@@ -37,7 +38,7 @@ class Proxy(object):
 
         try:
             proxy_v6 = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-            proxy_v6.bind(LISTENER_IPV6)
+            proxy_v6.bind(('::', self.v6_port))
             listener_v6 = Thread(target=self.proxy_listen, args=[proxy_v6])
             listener_v6.setDaemon(True)
             listener_v6.start()
@@ -126,11 +127,9 @@ class Proxy(object):
                     client.sendall(b'1')
                     return client
             else:
-                token = client.recv(50).decode().split(';_;_;')
-                with open('config_proxy_auth.json', 'r') as f:
-                    auth = json.load(f)
-                for u in auth:
-                    if u['name'] == token[0] and u['pwd'] == token[1]:
+                token = client.recv(50).decode()
+                for t in self.tokens:
+                    if t == token:
                         client.sendall(b'1')
                         return client
                 client.close()
@@ -153,7 +152,6 @@ class Proxy(object):
             recver.close()
             sender.close()
             return
-            # self.append_log(ex, sys._getframe().f_code.co_name)
 
     def append_log(self, msg, func_name=''):
         dt = str(datetime.now())

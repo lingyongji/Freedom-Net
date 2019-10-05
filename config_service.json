@@ -1,0 +1,5 @@
+{
+	"v4_port": 8888,
+	"v6_port": 8889,
+	"tokens": ["admin_token", "user_token"]
+}
