@@ -3,13 +3,15 @@ import winreg
 
 INTERNET_OPTION_SETTINGS_CHANGED = 39
 INTERNET_OPTION_REFRESH = 37
+LISTENER = ('localhost', 9999)
 
 
 def set_proxy_config():
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Internet Settings', 0, winreg.KEY_WRITE) as key:
             winreg.SetValueEx(key, 'ProxyEnable', 0, winreg.REG_DWORD, 1)
-            winreg.SetValueEx(key, 'ProxyServer', 0, winreg.REG_SZ, 'localhost:7777')
+            winreg.SetValueEx(key, 'ProxyServer', 0, winreg.REG_SZ,
+                              '{0}:{1}'.format(LISTENER[0], LISTENER[1]))
         refresh()
     except Exception as ex:
         print(ex)
