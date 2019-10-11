@@ -1,10 +1,12 @@
-import socket
+import getopt
 import json
+import socket
+import sys
 import time
 from datetime import datetime
 from threading import Thread
-import sys
-import getopt
+
+from key_en_de import Key
 
 BUFFER_SIZE = 4096
 AIM_LOCAL = 1
@@ -22,6 +24,7 @@ class Proxy(object):
         self.v4_port = config['v4_port']
         self.v6_port = config['v6_port']
         self.server_mode = AIM_PROXY
+        self.key = Key()
 
     def run_proxy(self, mode):
         self.append_log('proxy start')
@@ -71,47 +74,25 @@ class Proxy(object):
                 family = socket.AF_INET
             service = socket.socket(family, socket.SOCK_STREAM)
 
-            header = client.recv(BUFFER_SIZE).decode()
-            header_items = header.split('\r\n')
-            connect_index = header_items[0].find('CONNECT')
-            host = ''
-            if connect_index < 0:  # http proxy
-                host_index = header.find('Host:')
-                get_index = header.find('GET http')
-                post_index = header.find('POST http')
-                if host_index > -1:
-                    rn_index = header.find('\r\n', host_index)
-                    host = header[host_index+6:rn_index]
-                elif get_index > -1 or post_index > -1:
-                    host = header.split('/')[2]
-                else:
-                    client.close()
-                    self.append_log('host parsing failed')
-                    return
-
-                host_items = host.split(':')
-                host = host_items[0]
-                if len(host_items) == 2:
-                    port = host_items[1]
-                else:
-                    port = 80
-
-                service.connect((host, int(port)))
-                service.sendall(header.encode())
-
-            else:  # https proxy
-                host = header_items[0][connect_index+8:].split(':')[0]
-
-                service.connect((host, 443))
-                client.sendall(b'HTTP/1.0 200 Connection Established\r\n\r\n')
+            data = client.recv(BUFFER_SIZE)
+            if self.server_mode == AIM_PROXY:
+                data = self.key.dekey(data)
+            hostaddr = data.decode()
+            host = hostaddr.split(':')[0]
+            port = int(hostaddr.split(':')[1])
+            if service.connect_ex((host, port)) == 0:
+                client.sendall(b'1')
+                self.append_log('connect {0} OK'.format(hostaddr))
+            else:
+                client.sendall(b'0')
+                client.close()
+                self.append_log('connect {0} failed'.format(hostaddr))
+                return
 
         except Exception as ex:
-            msg = str(ex) + ' | ' + host
-            self.append_log(msg, sys._getframe().f_code.co_name)
+            self.append_log(ex, sys._getframe().f_code.co_name)
             client.close()
             return
-
-        self.append_log('connect to [{0}]'.format(host))
 
         bridge1 = Thread(target=self.bridge, args=[client, service, True])
         bridge2 = Thread(target=self.bridge, args=[service, client, False])
@@ -127,7 +108,7 @@ class Proxy(object):
                     client.sendall(b'1')
                     return client
             else:
-                token = client.recv(50).decode()
+                token = self.key.dekey(client.recv(50)).decode()
                 for t in self.tokens:
                     if t == token:
                         client.sendall(b'1')
@@ -147,6 +128,8 @@ class Proxy(object):
                         recver.close()
                         sender.close()
                     break
+                if c_to_s and self.server_mode == AIM_PROXY:
+                    data = self.key.dekey(data)
                 sender.sendall(data)
         except Exception as ex:
             recver.close()

@@ -1,10 +1,12 @@
-import socket
 import json
+import socket
+import sys
 from datetime import datetime
 from threading import Thread
-from win_proxy_setting import set_proxy_config, back_proxy_config
-from https_proxy_service import Proxy, BUFFER_SIZE, AIM_LOCAL, AIM_PROXY
-import sys
+
+from https_proxy_service import AIM_LOCAL, AIM_PROXY, BUFFER_SIZE, Proxy
+from key_en_de import Key
+from win_proxy_setting import back_proxy_config, set_proxy_config
 
 
 class Client(object):
@@ -17,12 +19,13 @@ class Client(object):
         self.local_proxy_port = config['local_proxy_port']
         self.all_req_to_vps = config['all_req_to_vps']
         self.local_listener_port = config['local_listener_port']
-        self.token = config['token']
+        self.token = config['token'].encode()
 
         self.hosts = []
         with open('host.txt', 'r') as f:
             for h in f:
                 self.hosts.append(h)
+        self.key = Key()
 
     def run_client(self):
         set_proxy_config(self.local_listener_port)
@@ -62,10 +65,15 @@ class Client(object):
             client.close()
             return
 
+        host = self.get_host(request.decode())
+        if not host:
+            client.close()
+            return
+
         if bool(self.all_req_to_vps):
             proxy_aim = AIM_PROXY
         else:
-            proxy_aim = self.check_aim(request.decode())
+            proxy_aim = self.check_aim(host.split(':')[0])
             if not proxy_aim:
                 client.close()
                 return
@@ -77,21 +85,41 @@ class Client(object):
             return
 
         try:
-            proxy.sendall(request)
+            data = host.encode()
+            if proxy_aim == AIM_PROXY:
+                data = self.key.enkey(data)
+            proxy.sendall(data)
+            if proxy.recv(1) == b'1':
+                if host.split(':')[1] == '443':
+                    client.sendall(
+                        b'HTTP/1.0 200 Connection Established\r\n\r\n')
+                else:
+                    if proxy_aim == AIM_PROXY:
+                        request = self.key.enkey(request)
+                    proxy.sendall(request)
+                self.append_log('connect {0} OK'.format(host))
+            else:
+                proxy.close()
+                client.close()
+                self.append_log('connect {0} failed'.format(host))
+                return
 
         except Exception as ex:
             self.append_log(ex, sys._getframe().f_code.co_name)
             client.close()
+            proxy.close()
             return
 
-        bridge1 = Thread(target=self.bridge, args=[client, proxy, True])
-        bridge2 = Thread(target=self.bridge, args=[proxy, client, False])
+        bridge1 = Thread(target=self.bridge, args=[
+                         client, proxy, True, proxy_aim])
+        bridge2 = Thread(target=self.bridge, args=[
+                         proxy, client, False, proxy_aim])
         bridge1.setDaemon(True)
         bridge2.setDaemon(True)
         bridge1.start()
         bridge2.start()
 
-    def check_aim(self, header):
+    def get_host(self, header):
         try:
             header_items = header.split('\r\n')
             connect_index = header_items[0].find('CONNECT')
@@ -109,9 +137,19 @@ class Client(object):
 
                 host_items = host.split(':')
                 host = host_items[0]
+                if len(host_items) == 2:
+                    port = host_items[1]
+                else:
+                    port = 80
             else:  # https proxy
                 host = header_items[0][connect_index+8:].split(':')[0]
+                port = 443
+            return '{0}:{1}'.format(host, port)
+        except Exception as ex:
+            self.append_log(ex, sys._getframe().f_code.co_name)
 
+    def check_aim(self, host):
+        try:
             for h in self.hosts:
                 if host.find(str(h).strip()) >= 0:
                     self.append_log('request {0} by proxy'.format(host))
@@ -125,12 +163,12 @@ class Client(object):
         try:
             if proxy_aim == AIM_LOCAL:
                 proxy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                proxy.connect(('localhost', self.local_proxy_port))
-                proxy.sendall(b'1')
-                if proxy.recv(1) == b'1':
-                    return proxy
-                else:
-                    proxy.close()
+                if proxy.connect_ex(('localhost', self.local_proxy_port)) == 0:
+                    proxy.sendall(b'1')
+                    if proxy.recv(1) == b'1':
+                        return proxy
+                    else:
+                        proxy.close()
             else:
                 for u in self.vps:
                     if bool(u['used']):
@@ -138,17 +176,18 @@ class Client(object):
                         if (u['ipv']) == 6:
                             family = socket.AF_INET6
                         proxy = socket.socket(family, socket.SOCK_STREAM)
-                        proxy.connect((u['ip'], u['port']))
-                        proxy.sendall(self.token.encode())
-                        if proxy.recv(1) == b'1':
-                            return proxy
-                        else:
-                            self.append_log('{0} auth failed'.format(['ip']))
-                            proxy.close()
+                        if proxy.connect_ex((u['ip'], u['port'])) == 0:
+                            proxy.sendall(self.key.enkey(self.token))
+                            if proxy.recv(1) == b'1':
+                                return proxy
+                            else:
+                                self.append_log(
+                                    '{0} auth failed'.format(['ip']))
+                                proxy.close()
         except Exception as ex:
             self.append_log(ex, sys._getframe().f_code.co_name)
 
-    def bridge(self, recver, sender, c_to_s):
+    def bridge(self, recver, sender, c_to_s, proxy_aim):
         try:
             while True:
                 data = recver.recv(BUFFER_SIZE)
@@ -157,6 +196,8 @@ class Client(object):
                         recver.close()
                         sender.close()
                     break
+                if c_to_s and proxy_aim == AIM_PROXY:
+                    data = self.key.enkey(data)
                 sender.sendall(data)
         except Exception as ex:
             recver.close()
