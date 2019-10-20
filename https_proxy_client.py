@@ -20,11 +20,6 @@ class Client(object):
         self.all_req_to_vps = config['all_req_to_vps']
         self.local_listener_port = config['local_listener_port']
         self.token = config['token'].encode()
-
-        self.hosts = []
-        with open('host.txt', 'r') as f:
-            for h in f:
-                self.hosts.append(h)
         self.key = Key()
 
     def run_client(self):
@@ -150,10 +145,11 @@ class Client(object):
 
     def check_aim(self, host):
         try:
-            for h in self.hosts:
-                if host.find(str(h).strip()) >= 0:
-                    self.append_log('request {0} by proxy'.format(host))
-                    return AIM_PROXY
+            with open('host.txt', 'r') as f:
+                for h in f:
+                    if host.find(str(h).strip()) >= 0:
+                        self.append_log('request {0} by proxy'.format(host))
+                        return AIM_PROXY
 
             return AIM_LOCAL
         except Exception as ex:
