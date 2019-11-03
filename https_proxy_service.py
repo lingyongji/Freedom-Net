@@ -75,8 +75,8 @@ class Proxy(object):
             service = socket.socket(family, socket.SOCK_STREAM)
 
             data = client.recv(BUFFER_SIZE)
-            if self.server_mode == AIM_PROXY:
-                data = self.key.dekey(data)
+            # if self.server_mode == AIM_PROXY:
+            #     data = self.key.dekey(data)
             hostaddr = data.decode()
             host = hostaddr.split(':')[0]
             port = int(hostaddr.split(':')[1])
@@ -108,7 +108,7 @@ class Proxy(object):
                     client.sendall(b'1')
                     return client
             else:
-                token = self.key.dekey(client.recv(50)).decode()
+                token = self.key.dekey(client.recv(BUFFER_SIZE)).decode()
                 for t in self.tokens:
                     if t == token:
                         client.sendall(b'1')
@@ -128,8 +128,8 @@ class Proxy(object):
                         recver.close()
                         sender.close()
                     break
-                if c_to_s and self.server_mode == AIM_PROXY:
-                    data = self.key.dekey(data)
+                # if c_to_s and self.server_mode == AIM_PROXY:
+                #     data = self.key.dekey(data)
                 sender.sendall(data)
         except Exception as ex:
             recver.close()
@@ -138,7 +138,7 @@ class Proxy(object):
 
     def append_log(self, msg, func_name=''):
         dt = str(datetime.now())
-        with open('proxy.log', 'a') as f:
+        with open('log/{0}_proxy.log'.format(dt[0:10]), 'a') as f:
             f.write('{0} |S| {1} | {2} \n'.format(dt, str(msg), func_name))
 
 

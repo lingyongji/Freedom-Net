@@ -81,16 +81,16 @@ class Client(object):
 
         try:
             data = host.encode()
-            if proxy_aim == AIM_PROXY:
-                data = self.key.enkey(data)
+            # if proxy_aim == AIM_PROXY:
+            #     data = self.key.enkey(data)
             proxy.sendall(data)
             if proxy.recv(1) == b'1':
                 if host.split(':')[1] == '443':
                     client.sendall(
                         b'HTTP/1.0 200 Connection Established\r\n\r\n')
                 else:
-                    if proxy_aim == AIM_PROXY:
-                        request = self.key.enkey(request)
+                    # if proxy_aim == AIM_PROXY:
+                    #     request = self.key.enkey(request)
                     proxy.sendall(request)
                 self.append_log('connect {0} OK'.format(host))
             else:
@@ -192,8 +192,8 @@ class Client(object):
                         recver.close()
                         sender.close()
                     break
-                if c_to_s and proxy_aim == AIM_PROXY:
-                    data = self.key.enkey(data)
+                # if c_to_s and proxy_aim == AIM_PROXY:
+                #     data = self.key.enkey(data)
                 sender.sendall(data)
         except Exception as ex:
             recver.close()
@@ -202,7 +202,7 @@ class Client(object):
 
     def append_log(self, msg, func_name=''):
         dt = str(datetime.now())
-        with open('proxy.log', 'a') as f:
+        with open('log/{0}_proxy.log'.format(dt[0:10]), 'a') as f:
             f.write('{0} |C| {1} | {2} \n'.format(dt, str(msg), func_name))
 
 
