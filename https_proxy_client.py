@@ -5,7 +5,6 @@ from datetime import datetime
 from threading import Thread
 
 from https_proxy_service import AIM_LOCAL, AIM_PROXY, BUFFER_SIZE, Proxy
-from key_en_de import Key
 from win_proxy_setting import back_proxy_config, set_proxy_config
 
 
@@ -20,7 +19,6 @@ class Client(object):
         self.all_req_to_vps = config['all_req_to_vps']
         self.local_listener_port = config['local_listener_port']
         self.token = config['token'].encode()
-        self.key = Key()
 
     def run_client(self):
         set_proxy_config(self.local_listener_port)
@@ -81,16 +79,12 @@ class Client(object):
 
         try:
             data = host.encode()
-            # if proxy_aim == AIM_PROXY:
-            #     data = self.key.enkey(data)
             proxy.sendall(data)
             if proxy.recv(1) == b'1':
                 if host.split(':')[1] == '443':
                     client.sendall(
                         b'HTTP/1.0 200 Connection Established\r\n\r\n')
                 else:
-                    # if proxy_aim == AIM_PROXY:
-                    #     request = self.key.enkey(request)
                     proxy.sendall(request)
                 self.append_log('connect {0} OK'.format(host))
             else:
@@ -173,7 +167,7 @@ class Client(object):
                             family = socket.AF_INET6
                         proxy = socket.socket(family, socket.SOCK_STREAM)
                         if proxy.connect_ex((u['ip'], u['port'])) == 0:
-                            proxy.sendall(self.key.enkey(self.token))
+                            proxy.sendall(self.token)
                             if proxy.recv(1) == b'1':
                                 return proxy
                             else:
@@ -192,8 +186,6 @@ class Client(object):
                         recver.close()
                         sender.close()
                     break
-                # if c_to_s and proxy_aim == AIM_PROXY:
-                #     data = self.key.enkey(data)
                 sender.sendall(data)
         except Exception as ex:
             recver.close()

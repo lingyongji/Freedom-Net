@@ -1,3 +1,19 @@
+#!/bin/sh
+
+cd /root/
+mkdir proxy
+cd proxy/
+mkdir log
+
+cat >config_service.json<<EOF
+{
+	"v4_port": 443,
+	"v6_port": 80,
+	"tokens": ["admin_token", "user_token"]
+}
+EOF
+
+cat >https_proxy_service.py<<EOF
 import getopt
 import json
 import socket
@@ -149,3 +165,18 @@ if __name__ == '__main__':
             ip_version = int(arg)
 
     Proxy().run_proxy(AIM_PROXY)
+EOF
+
+cat >run<<EOF
+nohup python3 https_proxy_service.py > log.txt 2>&1 &
+EOF
+
+cat >run_ipv6<<EOF
+nohup python3 https_proxy_service.py -i 6 > log.txt 2>&1 &
+EOF
+
+cat >stop<<EOF
+eval $(ps -ef|grep "[0-9] python3 https_proxy_service.py"|awk '{print "kill "$2}')
+EOF
+
+bash run
